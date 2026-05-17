@@ -27,7 +27,7 @@ def run_simulation(
     baseline_consumption = agents.consumption.copy()
 
     effective_vat = vat_food_rate if vat_food_rate is not None else TUIK_2024["vat_food_rate"]
-    daily_inflation = (TUIK_2024["inflation_annual"] + inflation_shock) / 365
+    daily_inflation = (1 + TUIK_2024["inflation_annual"] + inflation_shock) ** (1/365) - 1
 
     effect_log = []
     if effects:
@@ -39,8 +39,8 @@ def run_simulation(
 
     for day in range(1, duration_days + 1):
         price_level *= (1 + daily_inflation)
-        _step(agents, price_level, effective_vat, rng, dynamics)
-        results.append(compute_daily_metrics(agents, baseline_consumption, effective_vat, day))
+        _step(agents, price_level, effective_vat, daily_inflation, rng, dynamics)
+        results.append(compute_daily_metrics(agents, baseline_consumption, effective_vat, day, price_level))
 
     return {"results": results, "effect_log": effect_log}
 
@@ -58,7 +58,7 @@ def run_simulation_chunked(
     baseline_consumption = agents.consumption.copy()
 
     effective_vat = vat_food_rate if vat_food_rate is not None else TUIK_2024["vat_food_rate"]
-    daily_inflation = (TUIK_2024["inflation_annual"] + inflation_shock) / 365
+    daily_inflation = (1 + TUIK_2024["inflation_annual"] + inflation_shock) ** (1/365) - 1
 
     if effects:
         apply_effects(agents, effects)
@@ -69,8 +69,8 @@ def run_simulation_chunked(
 
     for day in range(1, duration_days + 1):
         price_level *= (1 + daily_inflation)
-        _step(agents, price_level, effective_vat, rng, dynamics)
-        chunk.append(compute_daily_metrics(agents, baseline_consumption, effective_vat, day))
+        _step(agents, price_level, effective_vat, daily_inflation, rng, dynamics)
+        chunk.append(compute_daily_metrics(agents, baseline_consumption, effective_vat, day, price_level))
 
         if len(chunk) == chunk_size:
             yield chunk
@@ -80,7 +80,7 @@ def run_simulation_chunked(
         yield chunk
 
 
-def _step(agents: AgentPopulation, price_level: float, vat_rate: float, rng: np.random.Generator = None, dynamics: dict | None = None) -> None:
+def _step(agents: AgentPopulation, price_level: float, vat_rate: float, daily_inflation: float, rng: np.random.Generator = None, dynamics: dict | None = None) -> None:
     if rng is None:
         rng = np.random.default_rng()
 
@@ -118,6 +118,9 @@ def _step(agents: AgentPopulation, price_level: float, vat_rate: float, rng: np.
     broke_mask = unemployed_mask & (agents.savings <= 0)
     agents.consumption[broke_mask] = min_daily * 0.2
 
+    # Tüm ajanların tasarruflarını günlük enflasyon oranında reel olarak erit
+    agents.savings /= (1 + daily_inflation)
+
     # --- İSTİHDAM DİNAMİĞİ ---
 
     N = len(agents.age)
@@ -136,8 +139,8 @@ def _step(agents: AgentPopulation, price_level: float, vat_rate: float, rng: np.
     agents.employed[job_loss] = False
     agents.income[job_loss] = 0.0
 
-    # İşsizler: iş bulma — can_work=False olanlar iş bulamaz; broke olanlar çok düşük ihtimal
-    reemploy_prob = np.where(broke_mask, 0.0005, reemploy_base)
+    # İşsizler: iş bulma — can_work=False olanlar iş bulamaz; broke olanların iş bulma ihtimali düşer ama sıfırlanmaz
+    reemploy_prob = np.where(broke_mask, np.maximum(0.0005, reemploy_base * 0.5), reemploy_base)
     found_job = unemployed_mask & agents.can_work & (rng.random(N) < reemploy_prob)
     agents.employed[found_job] = True
     agents.income[found_job] = TUIK_2024["min_wage_monthly"] * (

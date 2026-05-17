@@ -82,8 +82,7 @@ def _apply_operation(
     # İstihdam etkisi yan etkileri
     if target == "employed" and operation == "set":
         if not value:
-            # İşten çıkarılanlar: çalışma yasağı + gelir sıfır
-            agents.can_work[mask] = False
+            # İşten çıkarılanlar: gelir sıfırlanır (ancak kalıcı yasak konmaz)
             agents.income[mask] = 0.0
         else:
             # İşe alınanlar: geliri sıfır olanlar asgari ücrete çıkar

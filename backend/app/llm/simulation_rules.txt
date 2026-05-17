@@ -31,3 +31,6 @@ Kullanıcıdan gelen senaryoları yorumlarken ezber yapma, yukarıdaki "felsefey
 
 DİKKAT (İSTİHDAM DURUMU):
 Bir yasayla ajanların şehrini (göç) veya sektörünü değiştirdiğinde, eğer o ajanlara aynı yasa kapsamında yeni bir iş/maaş VERMİYORSAN, eski işlerini kaybedecekleri için mutlaka `{"target": "employed", "operation": "set", "value": false}` ve `{"target": "income", "operation": "set", "value": 0}` etkilerini de listeye eklemelisin. Eğer yasa "Göç ettiler ve sanayide 40000 TL maaşla işe başladılar" diyorsa employed=true ve income=40000 olarak ayarlayabilirsin.
+
+DİKKAT (ÇALIŞMA YASAĞI):
+Eğer yasa doğrudan bir grubun çalışmasını YASAKLIYORSA (örneğin: "X grubunun çalışması yasaklandı"), o grubun `employed` değerini `false` yapmanın YANI SIRA `can_work` değerini de `false` yapmalısın. Eğer `can_work=false` yapmazsan, bu kişiler işten atılır ama ertesi gün başka bir iş bulabilirler. Sadece yasal yasaklarda `can_work=false` kullan!
